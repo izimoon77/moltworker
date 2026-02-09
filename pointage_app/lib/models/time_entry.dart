@@ -1,8 +1,43 @@
 enum TimeEntryType {
   travail,
-  conge,
-  maladie,
-  absence,
+  travailNuit,       // heures de nuit 22h-6h
+  travailFerie,      // jour férié
+  travailDimanche,   // dimanche
+  congePaye,
+  congeIntemperies,
+  congeSansSolde,
+  maternite,
+  accidentTravail,
+  maladieNonPro,
+  maladiePro,
+  autreAbsence,
+}
+
+extension TimeEntryTypeLabel on TimeEntryType {
+  String get label => switch (this) {
+    TimeEntryType.travail => 'Travail',
+    TimeEntryType.travailNuit => 'Travail de nuit',
+    TimeEntryType.travailFerie => 'Jour férié',
+    TimeEntryType.travailDimanche => 'Dimanche',
+    TimeEntryType.congePaye => 'Congé payé',
+    TimeEntryType.congeIntemperies => 'Congé intempéries',
+    TimeEntryType.congeSansSolde => 'Congé sans solde',
+    TimeEntryType.maternite => 'Maternité',
+    TimeEntryType.accidentTravail => 'Accident de travail',
+    TimeEntryType.maladieNonPro => 'Maladie non pro.',
+    TimeEntryType.maladiePro => 'Maladie pro.',
+    TimeEntryType.autreAbsence => 'Autre absence',
+  };
+
+  bool get estTravail => switch (this) {
+    TimeEntryType.travail ||
+    TimeEntryType.travailNuit ||
+    TimeEntryType.travailFerie ||
+    TimeEntryType.travailDimanche => true,
+    _ => false,
+  };
+
+  bool get estAbsence => !estTravail;
 }
 
 class TimeEntry {
@@ -13,6 +48,7 @@ class TimeEntry {
   final DateTime? heureDepart;
   final TimeEntryType type;
   final String? note;
+  final bool repas; // indemnité repas pour ce jour
 
   TimeEntry({
     this.id,
@@ -22,6 +58,7 @@ class TimeEntry {
     this.heureDepart,
     this.type = TimeEntryType.travail,
     this.note,
+    this.repas = false,
   });
 
   /// Durée travaillée en heures (décimales)
@@ -43,6 +80,7 @@ class TimeEntry {
       'heure_depart': heureDepart?.toIso8601String(),
       'type': type.name,
       'note': note,
+      'repas': repas ? 1 : 0,
     };
   }
 
@@ -62,6 +100,7 @@ class TimeEntry {
         orElse: () => TimeEntryType.travail,
       ),
       note: map['note'] as String?,
+      repas: (map['repas'] as int?) == 1,
     );
   }
 
@@ -73,6 +112,7 @@ class TimeEntry {
     DateTime? heureDepart,
     TimeEntryType? type,
     String? note,
+    bool? repas,
   }) {
     return TimeEntry(
       id: id ?? this.id,
@@ -82,6 +122,7 @@ class TimeEntry {
       heureDepart: heureDepart ?? this.heureDepart,
       type: type ?? this.type,
       note: note ?? this.note,
+      repas: repas ?? this.repas,
     );
   }
 }

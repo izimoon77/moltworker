@@ -4,6 +4,7 @@ import 'screens/pointage_screen.dart';
 import 'screens/employees_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/export_screen.dart';
+import 'screens/settings_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -47,9 +48,10 @@ class _MainShellState extends State<MainShell> {
 
   static const _titles = [
     'Pointage',
-    'Employés',
+    'Employes',
     'Historique',
     'Export comptable',
+    'Reglages',
   ];
 
   final _screens = const [
@@ -57,6 +59,7 @@ class _MainShellState extends State<MainShell> {
     EmployeesScreen(),
     HistoryScreen(),
     ExportScreen(),
+    SettingsScreen(),
   ];
 
   @override
@@ -84,7 +87,7 @@ class _MainShellState extends State<MainShell> {
           NavigationDestination(
             icon: Icon(Icons.people_outline),
             selectedIcon: Icon(Icons.people, color: Colors.blue),
-            label: 'Employés',
+            label: 'Employes',
           ),
           NavigationDestination(
             icon: Icon(Icons.history),
@@ -95,6 +98,11 @@ class _MainShellState extends State<MainShell> {
             icon: Icon(Icons.file_download_outlined),
             selectedIcon: Icon(Icons.file_download, color: Colors.blue),
             label: 'Export',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.settings_outlined),
+            selectedIcon: Icon(Icons.settings, color: Colors.blue),
+            label: 'Reglages',
           ),
         ],
       ),

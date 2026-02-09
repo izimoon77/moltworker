@@ -57,30 +57,35 @@ class _HistoryScreenState extends State<HistoryScreen> {
     return emp?.nomComplet ?? 'Inconnu';
   }
 
-  String _typeLabel(TimeEntryType type) {
-    return switch (type) {
-      TimeEntryType.travail => 'Travail',
-      TimeEntryType.conge => 'Congé',
-      TimeEntryType.maladie => 'Maladie',
-      TimeEntryType.absence => 'Absence',
-    };
-  }
-
   Color _typeColor(TimeEntryType type) {
+    if (type.estTravail) return Colors.green;
     return switch (type) {
-      TimeEntryType.travail => Colors.green,
-      TimeEntryType.conge => Colors.blue,
-      TimeEntryType.maladie => Colors.red,
-      TimeEntryType.absence => Colors.orange,
+      TimeEntryType.congePaye => Colors.blue,
+      TimeEntryType.congeIntemperies => Colors.blueGrey,
+      TimeEntryType.congeSansSolde => Colors.purple,
+      TimeEntryType.maternite => Colors.pink,
+      TimeEntryType.accidentTravail => Colors.red,
+      TimeEntryType.maladieNonPro => Colors.orange,
+      TimeEntryType.maladiePro => Colors.deepOrange,
+      TimeEntryType.autreAbsence => Colors.grey,
+      _ => Colors.grey,
     };
   }
 
   IconData _typeIcon(TimeEntryType type) {
     return switch (type) {
       TimeEntryType.travail => Icons.work,
-      TimeEntryType.conge => Icons.beach_access,
-      TimeEntryType.maladie => Icons.local_hospital,
-      TimeEntryType.absence => Icons.event_busy,
+      TimeEntryType.travailNuit => Icons.nightlight,
+      TimeEntryType.travailFerie => Icons.flag,
+      TimeEntryType.travailDimanche => Icons.weekend,
+      TimeEntryType.congePaye => Icons.beach_access,
+      TimeEntryType.congeIntemperies => Icons.thunderstorm,
+      TimeEntryType.congeSansSolde => Icons.money_off,
+      TimeEntryType.maternite => Icons.child_friendly,
+      TimeEntryType.accidentTravail => Icons.warning,
+      TimeEntryType.maladieNonPro => Icons.local_hospital,
+      TimeEntryType.maladiePro => Icons.health_and_safety,
+      TimeEntryType.autreAbsence => Icons.event_busy,
     };
   }
 
@@ -116,20 +121,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Filtre par employé
         Padding(
           padding: const EdgeInsets.all(16),
           child: DropdownButtonFormField<Employee?>(
             value: _selectedEmployee,
             decoration: const InputDecoration(
-              labelText: 'Filtrer par employé',
+              labelText: 'Filtrer par employe',
               border: OutlineInputBorder(),
               prefixIcon: Icon(Icons.filter_list),
             ),
             items: [
               const DropdownMenuItem<Employee?>(
                 value: null,
-                child: Text('Tous les employés'),
+                child: Text('Tous les employes'),
               ),
               ..._employees.map((e) {
                 return DropdownMenuItem<Employee?>(
@@ -141,15 +145,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             onChanged: (employee) => _filterByEmployee(employee),
           ),
         ),
-
-        // Liste des pointages
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _entries.isEmpty
                   ? const Center(
                       child: Text(
-                        'Aucun pointage trouvé',
+                        'Aucun pointage trouve',
                         style: TextStyle(color: Colors.grey, fontSize: 16),
                       ),
                     )
@@ -167,8 +169,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                             alignment: Alignment.centerRight,
                             padding: const EdgeInsets.only(right: 16),
                             color: Colors.red,
-                            child:
-                                const Icon(Icons.delete, color: Colors.white),
+                            child: const Icon(Icons.delete, color: Colors.white),
                           ),
                           confirmDismiss: (_) async {
                             await _deleteEntry(entry);
@@ -186,23 +187,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
                               ),
                               title: Text(
                                 '${_getEmployeeName(entry.employeeId)} - ${_dateFormat.format(entry.date)}',
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600),
+                                style: const TextStyle(fontWeight: FontWeight.w600),
                               ),
-                              subtitle: entry.type == TimeEntryType.travail
-                                  ? Text(
-                                      '${entry.heureArrivee != null ? _timeFormat.format(entry.heureArrivee!) : '?'}'
-                                      ' → '
+                              subtitle: Text(
+                                entry.type.estTravail
+                                    ? '${entry.heureArrivee != null ? _timeFormat.format(entry.heureArrivee!) : '?'}'
+                                      ' -> '
                                       '${entry.heureDepart != null ? _timeFormat.format(entry.heureDepart!) : 'en cours'}'
-                                      '${heures > 0 ? ' (${heures.toStringAsFixed(1)}h)' : ''}',
-                                    )
-                                  : Text(_typeLabel(entry.type)),
+                                      '${heures > 0 ? ' (${heures.toStringAsFixed(1)}h)' : ''}'
+                                      ' - ${entry.type.label}'
+                                      '${entry.repas ? ' - Repas' : ''}'
+                                    : '${entry.type.label}${entry.note != null ? ' (${entry.note})' : ''}',
+                              ),
                               trailing: entry.estEnCours
                                   ? Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 4,
-                                      ),
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
                                         color: Colors.green.shade100,
                                         borderRadius: BorderRadius.circular(12),

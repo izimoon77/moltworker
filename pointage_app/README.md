@@ -1,33 +1,55 @@
 # Pointage App
 
-Application Flutter de pointage des heures employés avec export des variables comptables pour le cabinet comptable.
+Application Flutter de pointage des heures employes avec export CSV au format exact attendu par le cabinet comptable.
 
-## Fonctionnalités
+## Fonctionnalites
 
-- **Pointage** : Arrivée/Départ en un tap par employé
-- **Gestion employés** : Ajout, modification, activation/désactivation
-- **Types d'entrées** : Travail, Congé, Maladie, Absence
+- **Pointage** : Arrivee/Depart en un tap (travail normal, nuit, ferie, dimanche)
+- **Gestion employes** : Ajout, modification, activation/desactivation, salaire, mutuelle
+- **Absences** : Conge paye, intemperies, sans solde, maternite, accident de travail, maladie pro/non pro, autre
+- **Indemnite repas** : Compteur automatique par jour travaille
 - **Historique** : Consultation et filtrage des pointages
-- **Export CSV** : Variables prêtes pour le cabinet comptable
+- **Export CSV** : Format identique au tableau "Variables de Paie" du cabinet comptable
+- **Reglages** : Nom de la societe pour l'en-tete du CSV
 
-## Variables exportées pour la comptabilité
+## Format de l'export CSV
 
-| Variable | Description |
+Le CSV genere reproduit exactement le format du tableau "VARIABLE DE PAIE" :
+
+- **Format transpose** : lignes = variables, colonnes = un salarie chacune
+- **Separateur** : point-virgule (;)
+- **Nom du fichier** : `VARIABLE_DE_PAIE_MOIS_ANNEE.csv`
+
+### Variables exportees
+
+| Ligne | Variable |
 |---|---|
-| Matricule | Identifiant unique de l'employé |
-| Nom / Prénom | Identité |
-| Poste | Fonction occupée |
-| Période | Mois/Année |
-| Heures normales | Heures dans le cadre contractuel |
-| Heures sup 25% | Heures supplémentaires majorées à 25% (35h-43h/sem) |
-| Heures sup 50% | Heures supplémentaires majorées à 50% (>43h/sem) |
-| Total heures | Cumul mensuel |
-| Jours travaillés | Nombre de jours effectifs |
-| Jours congés | Congés posés |
-| Jours maladie | Arrêts maladie |
-| Jours absence | Autres absences |
-| Taux horaire | Taux horaire brut en € |
-| Salaire brut estimé | Estimation du brut mensuel |
+| 1 | NOM DE LA SOCIETE |
+| 2 | mois : Mois Annee |
+| 3 | Nom et prenom du salarie |
+| 4 | Montant du salaire (SMIC ou montant brut) |
+| 5 | Total des heures travaillees dans le mois |
+| 6 | Heures Complementaires (temps partiel) |
+| 7 | Heures de Nuit (22h-6h) |
+| 8 | HS 25% 36eme a 43eme heure |
+| 9 | HS 50% a partir de la 44eme heure |
+| 10 | Heures de jour ferie |
+| 11 | Heures de dimanche |
+| 12 | Conges payes (du/au) |
+| 13 | Conges intemperies (du/au) |
+| 14 | Conges sans soldes (du/au) |
+| 15 | Maternite (du/au) |
+| 16 | Accident de travail (du/au) |
+| 17 | Maladie non professionnelle (du/au) |
+| 18 | Maladie Professionnelle (du/au) |
+| 19 | Autres Absences (du/au) |
+| 20 | Motif autres absences |
+| 21 | Acomptes |
+| 22 | Prime de Partage de la Valeur (PPV) |
+| 23 | Autres primes (soumises aux charges sociales) |
+| 24 | Indemnite repas (nombre) |
+| 25 | Adhesion a la mutuelle (OUI/NON + date) |
+| 26 | Autres variables |
 
 ## Installation
 
@@ -41,24 +63,26 @@ flutter run
 
 ```
 lib/
-├── main.dart                  # Point d'entrée, navigation
+├── main.dart                   # Point d'entree, navigation 5 onglets
 ├── models/
-│   ├── employee.dart          # Modèle employé
-│   ├── time_entry.dart        # Modèle pointage
-│   └── payroll_export.dart    # Modèle export paie
+│   ├── employee.dart           # Modele employe (matricule, salaire, mutuelle...)
+│   ├── time_entry.dart         # Modele pointage (12 types)
+│   └── payroll_export.dart     # Modele export paie (24 variables)
 ├── services/
-│   ├── database_service.dart  # SQLite (stockage local)
-│   └── export_service.dart    # Calcul paie + génération CSV
+│   ├── database_service.dart   # SQLite (employes, pointages, parametres)
+│   └── export_service.dart     # Calcul paie + CSV transpose
 └── screens/
-    ├── pointage_screen.dart   # Écran de pointage
-    ├── employees_screen.dart  # Gestion des employés
-    ├── history_screen.dart    # Historique des pointages
-    └── export_screen.dart     # Aperçu et export comptable
+    ├── pointage_screen.dart    # Ecran de pointage (arrivee/depart + absences)
+    ├── employees_screen.dart   # Gestion des employes
+    ├── history_screen.dart     # Historique des pointages
+    ├── export_screen.dart      # Apercu et export comptable
+    └── settings_screen.dart    # Parametres societe
 ```
 
 ## Stack technique
 
 - **Flutter** avec Material 3
 - **SQLite** (sqflite) pour le stockage local
-- **CSV** pour l'export comptable
+- **CSV** pour l'export comptable (separateur ;)
 - **share_plus** pour le partage du fichier CSV (email, messagerie...)
+- **intl** pour le formatage des dates en francais

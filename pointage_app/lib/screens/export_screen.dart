@@ -51,42 +51,6 @@ class _ExportScreenState extends State<ExportScreen> {
     });
   }
 
-  Future<void> _exportCsv() async {
-    setState(() => _exporting = true);
-    try {
-      final path = await _exportService.exportMonthlyCsv(
-        _selectedYear,
-        _selectedMonth,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Export enregistré : $path'),
-            action: SnackBarAction(
-              label: 'Partager',
-              onPressed: () {
-                Share.shareXFiles([XFile(path)],
-                    text: 'Export paie ${_selectedMonth.toString().padLeft(2, '0')}/$_selectedYear');
-              },
-            ),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Erreur : $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _exporting = false);
-    }
-  }
-
   Future<void> _shareCsv() async {
     setState(() => _exporting = true);
     try {
@@ -96,9 +60,39 @@ class _ExportScreenState extends State<ExportScreen> {
       );
       await Share.shareXFiles(
         [XFile(path)],
-        text:
-            'Export paie ${_selectedMonth.toString().padLeft(2, '0')}/$_selectedYear',
+        text: 'Variables de paie ${_monthName(_selectedMonth)} $_selectedYear',
       );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur : $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      setState(() => _exporting = false);
+    }
+  }
+
+  Future<void> _exportCsv() async {
+    setState(() => _exporting = true);
+    try {
+      final path = await _exportService.exportMonthlyCsv(
+        _selectedYear,
+        _selectedMonth,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fichier enregistre : $path'),
+            action: SnackBarAction(
+              label: 'Partager',
+              onPressed: () {
+                Share.shareXFiles([XFile(path)]);
+              },
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -114,11 +108,16 @@ class _ExportScreenState extends State<ExportScreen> {
     return DateFormat('MMMM', 'fr_FR').format(DateTime(2024, month));
   }
 
+  static String _formatRanges(List<DateRange> ranges) {
+    if (ranges.isEmpty) return '-';
+    return ranges.map((r) => r.format()).join(', ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Sélection de la période
+        // Selection periode
         Card(
           margin: const EdgeInsets.all(16),
           child: Padding(
@@ -127,7 +126,7 @@ class _ExportScreenState extends State<ExportScreen> {
               children: [
                 const Icon(Icons.calendar_month, color: Colors.blue),
                 const SizedBox(width: 12),
-                const Text('Période :', style: TextStyle(fontSize: 16)),
+                const Text('Periode :', style: TextStyle(fontSize: 16)),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _selectedMonth,
@@ -166,14 +165,14 @@ class _ExportScreenState extends State<ExportScreen> {
           ),
         ),
 
-        // Aperçu des données
+        // Apercu des donnees par employe
         Expanded(
           child: _loading
               ? const Center(child: CircularProgressIndicator())
               : _previews.isEmpty
                   ? const Center(
                       child: Text(
-                        'Aucune donnée pour cette période',
+                        'Aucune donnee pour cette periode',
                         style: TextStyle(color: Colors.grey, fontSize: 16),
                       ),
                     )
@@ -184,48 +183,49 @@ class _ExportScreenState extends State<ExportScreen> {
                         final p = _previews[index];
                         return Card(
                           child: ExpansionTile(
-                            leading: const CircleAvatar(
-                              child: Icon(Icons.person),
-                            ),
+                            leading: const CircleAvatar(child: Icon(Icons.person)),
                             title: Text(
-                              '${p.prenom} ${p.nom}',
-                              style:
-                                  const TextStyle(fontWeight: FontWeight.w600),
+                              '${p.prenom} ${p.nom}'.toUpperCase(),
+                              style: const TextStyle(fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(
-                              '${p.totalHeures.toStringAsFixed(1)}h - ${p.salaireBrutEstime.toStringAsFixed(2)}€ brut estimé',
+                              '${p.totalHeures.toStringAsFixed(1)}h - ${p.salaire} - Repas: ${p.indemniteRepas}',
                             ),
                             children: [
-                              _buildInfoRow('Matricule', p.matricule),
-                              _buildInfoRow('Poste', p.poste),
-                              _buildInfoRow('Période', p.periode),
+                              _row('Salaire', p.salaire),
+                              _row('Total heures', '${p.totalHeures.toStringAsFixed(2)}h'),
+                              if (p.heuresComplementaires > 0)
+                                _row('H. complementaires', '${p.heuresComplementaires.toStringAsFixed(2)}h'),
+                              if (p.heuresNuit > 0)
+                                _row('H. nuit (22h-6h)', '${p.heuresNuit.toStringAsFixed(2)}h'),
+                              if (p.heuresSup25 > 0)
+                                _row('HS 25%', '${p.heuresSup25.toStringAsFixed(2)}h'),
+                              if (p.heuresSup50 > 0)
+                                _row('HS 50%', '${p.heuresSup50.toStringAsFixed(2)}h'),
+                              if (p.heuresFerie > 0)
+                                _row('H. jour ferie', '${p.heuresFerie.toStringAsFixed(2)}h'),
+                              if (p.heuresDimanche > 0)
+                                _row('H. dimanche', '${p.heuresDimanche.toStringAsFixed(2)}h'),
                               const Divider(),
-                              _buildInfoRow('Heures normales',
-                                  '${p.heuresNormales.toStringAsFixed(2)}h'),
-                              _buildInfoRow('Heures sup 25%',
-                                  '${p.heuresSup25.toStringAsFixed(2)}h'),
-                              _buildInfoRow('Heures sup 50%',
-                                  '${p.heuresSup50.toStringAsFixed(2)}h'),
-                              _buildInfoRow('Total heures',
-                                  '${p.totalHeures.toStringAsFixed(2)}h',
-                                  bold: true),
+                              if (p.congesPayes.isNotEmpty)
+                                _row('Conges payes', _formatRanges(p.congesPayes)),
+                              if (p.congesIntemperies.isNotEmpty)
+                                _row('Conges intemperies', _formatRanges(p.congesIntemperies)),
+                              if (p.congesSansSolde.isNotEmpty)
+                                _row('Conges sans solde', _formatRanges(p.congesSansSolde)),
+                              if (p.maternite.isNotEmpty)
+                                _row('Maternite', _formatRanges(p.maternite)),
+                              if (p.accidentTravail.isNotEmpty)
+                                _row('Accident travail', _formatRanges(p.accidentTravail)),
+                              if (p.maladieNonPro.isNotEmpty)
+                                _row('Maladie non pro.', _formatRanges(p.maladieNonPro)),
+                              if (p.maladiePro.isNotEmpty)
+                                _row('Maladie pro.', _formatRanges(p.maladiePro)),
+                              if (p.autresAbsences.isNotEmpty)
+                                _row('Autres absences', '${_formatRanges(p.autresAbsences)}${p.motifAutreAbsence != null ? ' (${p.motifAutreAbsence})' : ''}'),
                               const Divider(),
-                              _buildInfoRow('Jours travaillés',
-                                  '${p.joursTravailles}'),
-                              _buildInfoRow(
-                                  'Jours congés', '${p.joursConges}'),
-                              _buildInfoRow(
-                                  'Jours maladie', '${p.joursMaladie}'),
-                              _buildInfoRow(
-                                  'Jours absence', '${p.joursAbsence}'),
-                              const Divider(),
-                              _buildInfoRow('Taux horaire',
-                                  '${p.tauxHoraire.toStringAsFixed(2)}€/h'),
-                              _buildInfoRow(
-                                'Salaire brut estimé',
-                                '${p.salaireBrutEstime.toStringAsFixed(2)}€',
-                                bold: true,
-                              ),
+                              _row('Indemnite repas', '${p.indemniteRepas}'),
+                              _row('Mutuelle', p.mutuelle),
                               const SizedBox(height: 8),
                             ],
                           ),
@@ -272,19 +272,15 @@ class _ExportScreenState extends State<ExportScreen> {
     );
   }
 
-  Widget _buildInfoRow(String label, String value, {bool bold = false}) {
+  Widget _row(String label, String value) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(color: Colors.grey)),
-          Text(
-            value,
-            style: TextStyle(
-              fontWeight: bold ? FontWeight.bold : FontWeight.normal,
-            ),
-          ),
+          Flexible(child: Text(label, style: const TextStyle(color: Colors.grey))),
+          const SizedBox(width: 8),
+          Flexible(child: Text(value, textAlign: TextAlign.end)),
         ],
       ),
     );

@@ -17,6 +17,7 @@ class _PointageScreenState extends State<PointageScreen> {
   Employee? _selectedEmployee;
   TimeEntry? _activeEntry;
   bool _loading = true;
+  bool _repas = true; // indemnité repas cochée par défaut
 
   @override
   void initState() {
@@ -40,7 +41,7 @@ class _PointageScreenState extends State<PointageScreen> {
     });
   }
 
-  Future<void> _pointer() async {
+  Future<void> _pointer({TimeEntryType type = TimeEntryType.travail}) async {
     if (_selectedEmployee == null) return;
 
     final now = DateTime.now();
@@ -49,37 +50,34 @@ class _PointageScreenState extends State<PointageScreen> {
       // Départ : on complète le pointage en cours
       final updated = _activeEntry!.copyWith(heureDepart: now);
       await _db.updateTimeEntry(updated);
-      setState(() {
-        _activeEntry = null;
-      });
+      setState(() => _activeEntry = null);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Départ enregistré pour ${_selectedEmployee!.nomComplet} à ${DateFormat('HH:mm').format(now)}',
+              'Depart enregistre pour ${_selectedEmployee!.nomComplet} a ${DateFormat('HH:mm').format(now)}',
             ),
             backgroundColor: Colors.orange,
           ),
         );
       }
     } else {
-      // Arrivée : on crée un nouveau pointage
+      // Arrivée : nouveau pointage
       final entry = TimeEntry(
         employeeId: _selectedEmployee!.id!,
         date: DateTime(now.year, now.month, now.day),
         heureArrivee: now,
-        type: TimeEntryType.travail,
+        type: type,
+        repas: _repas,
       );
       await _db.insertTimeEntry(entry);
       final active = await _db.getActiveEntry(_selectedEmployee!.id!);
-      setState(() {
-        _activeEntry = active;
-      });
+      setState(() => _activeEntry = active);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Arrivée enregistrée pour ${_selectedEmployee!.nomComplet} à ${DateFormat('HH:mm').format(now)}',
+              'Arrivee enregistree pour ${_selectedEmployee!.nomComplet} a ${DateFormat('HH:mm').format(now)} (${type.label})',
             ),
             backgroundColor: Colors.green,
           ),
@@ -91,25 +89,55 @@ class _PointageScreenState extends State<PointageScreen> {
   Future<void> _enregistrerAbsence(TimeEntryType type) async {
     if (_selectedEmployee == null) return;
 
+    String? note;
+    if (type == TimeEntryType.autreAbsence) {
+      note = await _showNoteDialog();
+      if (note == null) return;
+    }
+
     final now = DateTime.now();
     final entry = TimeEntry(
       employeeId: _selectedEmployee!.id!,
       date: DateTime(now.year, now.month, now.day),
       type: type,
+      note: note,
     );
     await _db.insertTimeEntry(entry);
 
     if (mounted) {
-      final label = switch (type) {
-        TimeEntryType.conge => 'Congé',
-        TimeEntryType.maladie => 'Arrêt maladie',
-        TimeEntryType.absence => 'Absence',
-        _ => '',
-      };
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$label enregistré pour ${_selectedEmployee!.nomComplet}')),
+        SnackBar(
+          content: Text('${type.label} enregistre pour ${_selectedEmployee!.nomComplet}'),
+        ),
       );
     }
+  }
+
+  Future<String?> _showNoteDialog() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Motif de l\'absence'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            hintText: 'Saisir le motif...',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            child: const Text('Valider'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -128,12 +156,12 @@ class _PointageScreenState extends State<PointageScreen> {
               Icon(Icons.person_add, size: 80, color: Colors.grey.shade400),
               const SizedBox(height: 16),
               const Text(
-                'Aucun employé enregistré',
+                'Aucun employe enregistre',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
               const Text(
-                'Ajoutez des employés depuis l\'onglet "Employés" pour commencer.',
+                'Ajoutez des employes depuis l\'onglet "Employes" pour commencer.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey),
               ),
@@ -148,7 +176,7 @@ class _PointageScreenState extends State<PointageScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Sélection employé
+          // Selection employe
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -156,7 +184,7 @@ class _PointageScreenState extends State<PointageScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Sélectionner un employé',
+                    'Selectionner un employe',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 12),
@@ -182,104 +210,157 @@ class _PointageScreenState extends State<PointageScreen> {
             ),
           ),
 
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
 
-          // Bouton de pointage principal
           if (_selectedEmployee != null) ...[
+            // Options de pointage
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Checkbox(
+                      value: _repas,
+                      onChanged: (v) => setState(() => _repas = v ?? true),
+                    ),
+                    const Text('Indemnite repas'),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
             Expanded(
               child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    // Statut actuel
-                    if (_activeEntry != null) ...[
-                      const Icon(Icons.access_time, size: 40, color: Colors.green),
-                      const SizedBox(height: 8),
-                      Text(
-                        'En poste depuis ${DateFormat('HH:mm').format(_activeEntry!.heureArrivee!)}',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          color: Colors.green,
-                          fontWeight: FontWeight.w600,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Statut actuel
+                      if (_activeEntry != null) ...[
+                        const Icon(Icons.access_time, size: 40, color: Colors.green),
+                        const SizedBox(height: 8),
+                        Text(
+                          'En poste depuis ${DateFormat('HH:mm').format(_activeEntry!.heureArrivee!)} (${_activeEntry!.type.label})',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            color: Colors.green,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
+                        const SizedBox(height: 24),
+                      ],
 
-                    // Gros bouton de pointage
-                    SizedBox(
-                      width: 200,
-                      height: 200,
-                      child: ElevatedButton(
-                        onPressed: _pointer,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: _activeEntry != null
-                              ? Colors.orange
-                              : Colors.green,
-                          foregroundColor: Colors.white,
-                          shape: const CircleBorder(),
-                          elevation: 8,
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _activeEntry != null
-                                  ? Icons.logout
-                                  : Icons.login,
-                              size: 48,
+                      // Boutons de pointage travail
+                      if (_activeEntry == null) ...[
+                        // Pointage normal
+                        SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: ElevatedButton(
+                            onPressed: () => _pointer(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 8,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _activeEntry != null ? 'DÉPART' : 'ARRIVÉE',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.login, size: 44),
+                                SizedBox(height: 8),
+                                Text('ARRIVEE', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Options : nuit, ferie, dimanche
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            ActionChip(
+                              avatar: const Icon(Icons.nightlight, size: 18),
+                              label: const Text('Nuit'),
+                              onPressed: () => _pointer(type: TimeEntryType.travailNuit),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.flag, size: 18),
+                              label: const Text('Jour ferie'),
+                              onPressed: () => _pointer(type: TimeEntryType.travailFerie),
+                            ),
+                            ActionChip(
+                              avatar: const Icon(Icons.weekend, size: 18),
+                              label: const Text('Dimanche'),
+                              onPressed: () => _pointer(type: TimeEntryType.travailDimanche),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 32),
-
-                    // Boutons d'absence
-                    const Text(
-                      'Ou enregistrer :',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      children: [
-                        ActionChip(
-                          avatar: const Icon(Icons.beach_access, size: 18),
-                          label: const Text('Congé'),
-                          onPressed: () =>
-                              _enregistrerAbsence(TimeEntryType.conge),
-                        ),
-                        ActionChip(
-                          avatar: const Icon(Icons.local_hospital, size: 18),
-                          label: const Text('Maladie'),
-                          onPressed: () =>
-                              _enregistrerAbsence(TimeEntryType.maladie),
-                        ),
-                        ActionChip(
-                          avatar: const Icon(Icons.event_busy, size: 18),
-                          label: const Text('Absence'),
-                          onPressed: () =>
-                              _enregistrerAbsence(TimeEntryType.absence),
+                      ] else ...[
+                        // Bouton depart
+                        SizedBox(
+                          width: 180,
+                          height: 180,
+                          child: ElevatedButton(
+                            onPressed: () => _pointer(),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                              shape: const CircleBorder(),
+                              elevation: 8,
+                            ),
+                            child: const Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.logout, size: 44),
+                                SizedBox(height: 8),
+                                Text('DEPART', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
                         ),
                       ],
-                    ),
-                  ],
+
+                      const SizedBox(height: 32),
+
+                      // Absences
+                      const Text('Ou enregistrer une absence :', style: TextStyle(color: Colors.grey)),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.center,
+                        children: [
+                          _absenceChip(TimeEntryType.congePaye, Icons.beach_access),
+                          _absenceChip(TimeEntryType.congeIntemperies, Icons.thunderstorm),
+                          _absenceChip(TimeEntryType.congeSansSolde, Icons.money_off),
+                          _absenceChip(TimeEntryType.maternite, Icons.child_friendly),
+                          _absenceChip(TimeEntryType.accidentTravail, Icons.warning),
+                          _absenceChip(TimeEntryType.maladieNonPro, Icons.local_hospital),
+                          _absenceChip(TimeEntryType.maladiePro, Icons.health_and_safety),
+                          _absenceChip(TimeEntryType.autreAbsence, Icons.event_busy),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  Widget _absenceChip(TimeEntryType type, IconData icon) {
+    return ActionChip(
+      avatar: Icon(icon, size: 16),
+      label: Text(type.label, style: const TextStyle(fontSize: 12)),
+      onPressed: () => _enregistrerAbsence(type),
     );
   }
 }

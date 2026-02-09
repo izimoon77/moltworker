@@ -36,6 +36,9 @@ class DatabaseService {
         poste TEXT NOT NULL,
         taux_horaire REAL NOT NULL,
         heures_hebdo REAL NOT NULL DEFAULT 35.0,
+        salaire TEXT NOT NULL DEFAULT 'SMIC',
+        mutuelle INTEGER NOT NULL DEFAULT 0,
+        date_mutuelle TEXT,
         actif INTEGER NOT NULL DEFAULT 1
       )
     ''');
@@ -49,6 +52,7 @@ class DatabaseService {
         heure_depart TEXT,
         type TEXT NOT NULL DEFAULT 'travail',
         note TEXT,
+        repas INTEGER NOT NULL DEFAULT 0,
         FOREIGN KEY (employee_id) REFERENCES employees (id)
       )
     ''');
@@ -57,6 +61,41 @@ class DatabaseService {
       CREATE INDEX idx_time_entries_employee_date
       ON time_entries (employee_id, date)
     ''');
+
+    await db.execute('''
+      CREATE TABLE company_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+  }
+
+  // ─── Paramètres société ───
+
+  Future<void> setSetting(String key, String value) async {
+    final db = await database;
+    await db.insert(
+      'company_settings',
+      {'key': key, 'value': value},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<String?> getSetting(String key) async {
+    final db = await database;
+    final maps = await db.query(
+      'company_settings',
+      where: 'key = ?',
+      whereArgs: [key],
+    );
+    if (maps.isEmpty) return null;
+    return maps.first['value'] as String;
+  }
+
+  Future<Map<String, String>> getAllSettings() async {
+    final db = await database;
+    final maps = await db.query('company_settings');
+    return {for (final m in maps) m['key'] as String: m['value'] as String};
   }
 
   // ─── Employés ───
@@ -157,32 +196,6 @@ class DatabaseService {
       orderBy: 'date ASC, heure_arrivee ASC',
     );
     return maps.map((map) => TimeEntry.fromMap(map)).toList();
-  }
-
-  /// Récupère les pointages de tous les employés pour un mois donné
-  Future<Map<int, List<TimeEntry>>> getAllMonthlyEntries(
-    int year,
-    int month,
-  ) async {
-    final db = await database;
-    final startDate = '$year-${month.toString().padLeft(2, '0')}-01';
-    final endMonth = month == 12 ? 1 : month + 1;
-    final endYear = month == 12 ? year + 1 : year;
-    final endDate = '$endYear-${endMonth.toString().padLeft(2, '0')}-01';
-
-    final maps = await db.query(
-      'time_entries',
-      where: 'date >= ? AND date < ?',
-      whereArgs: [startDate, endDate],
-      orderBy: 'employee_id ASC, date ASC, heure_arrivee ASC',
-    );
-
-    final result = <int, List<TimeEntry>>{};
-    for (final map in maps) {
-      final entry = TimeEntry.fromMap(map);
-      result.putIfAbsent(entry.employeeId, () => []).add(entry);
-    }
-    return result;
   }
 
   /// Récupère les derniers pointages pour l'historique
